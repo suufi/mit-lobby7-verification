@@ -81,7 +81,7 @@ async def code(ctx: discord.ApplicationContext, kerb: str, code: str):
     if not ctx.guild:
         return
 
-    await ctx.defer()
+    await ctx.defer(ephemeral=True)
 
     if not await userdb.verify_user(kerb, ctx.author.id, code, ctx.guild.id):
         await ctx.respond(
