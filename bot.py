@@ -97,9 +97,14 @@ async def code(ctx: discord.ApplicationContext, kerb: str, code: str):
 @admin.command(
     name="lookup_kerb", description="Lookup a user's kerb and return API info."
 )
+@discord.guild_only()
 @discord.default_permissions(administrator=True)
 @discord.option("kerb", description="Your Kerberos ID (without the @mit.edu).")
-async def lookup_kerb(ctx, kerb: str):
+async def lookup_kerb(ctx: discord.ApplicationContext, kerb: str):
+    if not ctx.author.guild_permissions.administrator:  # type: ignore
+        await ctx.respond("You must be an administrator to use this command.")
+        return
+
     if not kerb:
         await ctx.respond("Please provide a kerb to lookup.")
         return
@@ -124,6 +129,10 @@ async def lookup_kerb(ctx, kerb: str):
 @discord.default_permissions(administrator=True)
 @discord.option("kerb", description="The Kerberos ID (without the @mit.edu).")
 async def blacklist_kerb(ctx, kerb: str):
+    if not ctx.author.guild_permissions.administrator:  # ignore: line
+        await ctx.respond("You must be an administrator to use this command.")
+        return
+
     if not kerb:
         await ctx.respond("Please provide a kerb to blacklist.")
         return
@@ -140,6 +149,10 @@ async def blacklist_kerb(ctx, kerb: str):
 @discord.default_permissions(administrator=True)
 @discord.option("kerb", description="The Kerberos ID (without the @mit.edu).")
 async def unblacklist_kerb(ctx, kerb: str):
+    if not ctx.author.guild_permissions.administrator:  # ignore: line
+        await ctx.respond("You must be an administrator to use this command.")
+        return
+
     if not kerb:
         await ctx.respond("Please provide a kerb to unblacklist.")
         return
@@ -153,6 +166,9 @@ async def unblacklist_kerb(ctx, kerb: str):
 @admin.command(name="blacklist", description="Get a list of blacklisted kerbs.")
 @discord.default_permissions(administrator=True)
 async def get_blacklist(ctx):
+    if not ctx.author.guild_permissions.administrator:  # ignore: line
+        await ctx.respond("You must be an administrator to use this command.")
+        return
     blacklist = userdb.get_blacklisted_kerbs()
     await ctx.respond(f"**Blacklisted Kerbs:** {blacklist}")
     return
@@ -167,6 +183,9 @@ async def get_blacklist(ctx):
     channel_type=discord.ChannelType.text,
 )
 async def set_logging_channel(ctx, channel: discord.TextChannel):
+    if not ctx.author.guild_permissions.administrator:  # ignore: line
+        await ctx.respond("You must be an administrator to use this command.")
+        return
     userdb.set_logging_channel(channel.id)
     await ctx.respond(f"Successfully set logging channel to {channel.mention}.")
     await channel.send("Logging channel set.")
@@ -179,6 +198,9 @@ async def set_logging_channel(ctx, channel: discord.TextChannel):
 @discord.default_permissions(administrator=True)
 @discord.option("kerb", description="The Kerberos ID (without the @mit.edu).")
 async def get_affiliations(ctx, kerb: str):
+    if not ctx.author.guild_permissions.administrator:  # ignore: line
+        await ctx.respond("You must be an administrator to use this command.")
+        return
     if not kerb:
         await ctx.respond("Please provide a kerb to lookup.")
         return
@@ -211,6 +233,10 @@ async def get_affiliations(ctx, kerb: str):
 )
 @discord.default_permissions(administrator=True)
 async def update_roles(ctx, member: discord.Member):
+    if not ctx.author.guild_permissions.administrator:  # ignore: line
+        await ctx.respond("You must be an administrator to use this command.")
+        return
+
     verification_data = userdb.get_user_from_discordid(member.id)
     if verification_data is None:
         await ctx.respond("Could not find that user's verification.")
@@ -232,9 +258,14 @@ async def update_roles(ctx, member: discord.Member):
     name="add_togglerole",
     description="Add a role that can be toggled with /toggle_role.",
 )
+@discord.guild_only()
 @discord.default_permissions(administrator=True)
 @discord.option("role", description="The role to add.")
 async def add_togglerole(ctx: discord.ApplicationContext, role: discord.Role):
+    if not ctx.author.guild_permissions.administrator:  # type: ignore
+        await ctx.respond("You must be an administrator to use this command.")
+        return
+
     if role.id in userdb.get_togglable_roles():
         await ctx.respond("That role is already a togglerole.")
         return
@@ -251,6 +282,10 @@ async def add_togglerole(ctx: discord.ApplicationContext, role: discord.Role):
 @discord.default_permissions(administrator=True)
 @discord.option("role", description="The role to remove.")
 async def remove_togglerole(ctx: discord.ApplicationContext, role: discord.Role):
+    if not ctx.author.guild_permissions.administrator:  # type: ignore
+        await ctx.respond("You must be an administrator to use this command.")
+        return
+
     if role.id not in userdb.get_togglable_roles():
         await ctx.respond("That role is not a togglerole.")
         return
@@ -320,6 +355,10 @@ def clean_code(content):
 @bot.slash_command(dm_permission=False)
 @commands.is_owner()
 async def eval(ctx: discord.ApplicationContext, code: str):
+    if not ctx.author.id == bot.owner_id:  # ignore: line
+        await ctx.respond("You must be an administrator to use this command.")
+        return
+
     await ctx.response.defer(ephemeral=True)
     code = clean_code(code)
 
