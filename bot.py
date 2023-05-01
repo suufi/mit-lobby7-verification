@@ -42,6 +42,8 @@ async def verify(ctx, kerb: str):
             )
             return
 
+    await ctx.defer(ephemeral=True)
+
     _, failure_reason = await userdb.generate_secure_code(kerb, ctx.author.id)
 
     if failure_reason:
