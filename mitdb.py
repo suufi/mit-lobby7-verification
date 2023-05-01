@@ -19,13 +19,6 @@ load_dotenv()
 mongo_client = pymongo.MongoClient(os.getenv("MONGODB_URI"))
 mitdb = mongo_client["mitdb"]
 
-smtp = smtplib.SMTP(
-    os.getenv("MIT_SMTP_SERVER", "outgoing.mit.edu"),
-    int(os.getenv("MIT_SMTP_PORT", 587)),
-)
-smtp.starttls()
-smtp.login(os.getenv("MIT_SMTP_USERNAME", ""), os.getenv("MIT_SMTP_PASSWORD", ""))
-
 users = mitdb["users"]
 verification_codes = mitdb["verification_codes"]
 if "created_at_1" not in verification_codes.index_information():
@@ -155,6 +148,15 @@ class MITUserDB:
         return await self.send_code_via_email(kerb, verification_code)
 
     async def send_code_via_email(self, kerb, verification_code):
+        smtp = smtplib.SMTP(
+            os.getenv("MIT_SMTP_SERVER", "outgoing.mit.edu"),
+            int(os.getenv("MIT_SMTP_PORT", 587)),
+        )
+        smtp.starttls()
+        smtp.login(
+            os.getenv("MIT_SMTP_USERNAME", ""), os.getenv("MIT_SMTP_PASSWORD", "")
+        )
+
         sender = "mit-discord@mit.edu"
         if kerb.endswith("@alum.mit.edu"):
             receiver = kerb
@@ -185,6 +187,7 @@ class MITUserDB:
 
         try:
             smtp.sendmail(sender, receiver, msg.as_string())
+            smtp.close()
             return True, None
         except smtplib.SMTPException:
             logging_channel = self.bot.get_channel(self.logging_channel_id)
@@ -192,6 +195,7 @@ class MITUserDB:
                 await logging_channel.send(
                     f":warning: Kerb ({kerb}) verification failed due to SMTP error."
                 )
+            smtp.close()
             return False, "Could not send email."
 
     def get_verification_code(self, kerb: str):
