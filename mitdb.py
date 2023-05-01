@@ -2,7 +2,10 @@ import datetime
 import os
 import pickle
 import random
+import smtplib
 import string
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import List, TypedDict
 
 import discord
@@ -10,12 +13,18 @@ import pymongo
 import requests
 import sendgrid
 from dotenv import load_dotenv
-from sendgrid.helpers.mail import Content, From, Mail, To
 
 load_dotenv()
 
 mongo_client = pymongo.MongoClient(os.getenv("MONGODB_URI"))
 mitdb = mongo_client["mitdb"]
+
+smtp = smtplib.SMTP(
+    os.getenv("MIT_SMTP_SERVER", "outgoing.mit.edu"),
+    int(os.getenv("MIT_SMTP_PORT", 587)),
+)
+smtp.starttls()
+smtp.login(os.getenv("MIT_SMTP_USERNAME", ""), os.getenv("MIT_SMTP_PASSWORD", ""))
 
 users = mitdb["users"]
 verification_codes = mitdb["verification_codes"]
@@ -143,28 +152,46 @@ class MITUserDB:
                 f":white_circle: Kerb ({kerb}) verification started by <@{discordID}>"
             )
 
-        return self.send_code_via_email(kerb, verification_code)
+        return await self.send_code_via_email(kerb, verification_code)
 
-    def send_code_via_email(self, kerb, verification_code):
-        from_email = From("mit-discord@mit.edu", "MIT Discord - Lobby 7 Verification")
+    async def send_code_via_email(self, kerb, verification_code):
+        sender = "mit-discord@mit.edu"
         if kerb.endswith("@alum.mit.edu"):
-            to_email = To(kerb)
+            receiver = kerb
         else:
-            to_email = To(kerb + "@mit.edu")
+            receiver = kerb + "@mit.edu"
 
-        subject = "MIT Discord Verification Code"
-        content = Content(
-            "text/plain",
-            f"Your verification code is: {verification_code}. Please enter /code kerb:{kerb} code:{verification_code} in the #verification channel to complete the verification process. After 10 minutes, this code will expire and you will have to restart the verification process. If you did not request this code, please ignore this email. If you have any questions, feel free to reply back to this email.\n\n- MIT Discord Team",
-        )
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "MIT Discord Verification Code"
+        msg["From"] = f"Lobby 7 Verification <{sender}>"
+        msg["To"] = receiver
 
-        mail = Mail(from_email, to_email, subject, content)
+        text = f"""Your verification code is: {verification_code}. Please enter /code kerb:{kerb} code:{verification_code} in the #verification channel to complete the verification process. If you are on mobile, please be careful with copy and pasting the message–you may need to wait for a black box to appear. After 10 minutes, this code will expire and you will have to restart the verification process. If you did not request this code, please ignore this email. If you have any questions, feel free to reply back to this email."""
+        html = f"""
+        <html>
+            <head></head>
+            <body>
+                <p>Your verification code is: {verification_code}.</p>
 
-        response = sg.client.mail.send.post(request_body=mail.get())  # type: ignore
+                <p>Please enter <b>/code kerb:{kerb} code:{verification_code}</b> in the #verification channel to complete the verification process. If you are on mobile, please be careful with copy and pasting the message–you may need to wait for a black box to appear.</p>
 
-        if response.status_code == 202:
+                <p>After 10 minutes, this code will expire and you will have to restart the verification process. If you did not request this code, please ignore this email. If you have any questions, feel free to reply back to this email.</p>
+            </body>
+        </html>
+        """
+
+        msg.attach(MIMEText(text, "plain"))
+        msg.attach(MIMEText(html, "html"))
+
+        try:
+            smtp.sendmail(sender, receiver, msg.as_string())
             return True, None
-        else:
+        except smtplib.SMTPException:
+            logging_channel = self.bot.get_channel(self.logging_channel_id)
+            if isinstance(logging_channel, discord.TextChannel):
+                await logging_channel.send(
+                    f":warning: Kerb ({kerb}) verification failed due to SMTP error."
+                )
             return False, "Could not send email."
 
     def get_verification_code(self, kerb: str):
@@ -269,7 +296,7 @@ class MITUserDB:
                     elif affiliation["type"] == "staff":
                         roles_to_add.append(discord.utils.get(guild.roles, name="Staff/Faculty"))  # type: ignore
         elif alumni:
-            roles_to_add.append(discord.utils.get(guild.roles, name="Alumnus/a"))  # type: ignore
+            roles_to_add.append(discord.utils.get(guild.roles, name="Alumni"))  # type: ignore
 
         roles_to_add = [role for role in roles_to_add if role is not None]
         if not dry_run:
