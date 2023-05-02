@@ -282,7 +282,9 @@ class MITUserDB:
             for affiliation in kerb_data["affiliations"]:
                 if affiliation["type"] == "affiliate":
                     roles_to_add.append(discord.utils.get(guild.roles, name="Affiliate"))  # type: ignore
-
+                elif affiliation["type"] == "staff":
+                    roles_to_add.append(discord.utils.get(guild.roles, name="Staff/Faculty"))  # type: ignore
+                    break
                 if "departments" in affiliation.keys():
                     for department in affiliation["departments"]:
                         if department["code"].startswith("NI"):
