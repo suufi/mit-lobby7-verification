@@ -225,6 +225,7 @@ class MITUserDB:
                     "alum": kerb.endswith("@alum.mit.edu"),
                     "verified": True,
                     "verifiedAt": datetime.datetime.now(),
+                    "lastRoleUpdate": datetime.datetime.now(),
                 }
             )
             verification_codes.delete_one({"kerb": kerb})
@@ -261,16 +262,18 @@ class MITUserDB:
     ):
         guild = self.bot.get_guild(guildId)
         if not guild:
+            print(f"Guild with ID {guildId} not found.")
             return False
 
         member = guild.get_member(discordId)
         if not member:
+            print(f"Member with ID {discordId} not found in guild {guild.name}.")
             return False
 
-        # check if already verified
+        # # check if already verified
         user_data, kerb_data = self.get_user(kerb)
-        if not user_data and not dry_run:
-            return False
+        # if not user_data and not dry_run:
+        #     return False
 
         roles_to_add: List[discord.Role] = []
 
@@ -304,7 +307,11 @@ class MITUserDB:
         elif alumni:
             roles_to_add.append(discord.utils.get(guild.roles, name="Alumni"))  # type: ignore
 
-        roles_to_add = [role for role in roles_to_add if role is not None]
+        roles_to_add = [
+            role
+            for role in roles_to_add
+            if role is not None and role not in member.roles
+        ]
         if not dry_run:
             await member.add_roles(*roles_to_add)
 
@@ -315,17 +322,6 @@ class MITUserDB:
                     f":green_circle: Assigning {[role.name for role in roles_to_add]} to <@{discordId}>"
                 )
         return roles_to_add
-
-        # roles_to_add = []
-        # for role in available_roles:
-        #     if role.name ==
-
-        # { 'item': {'kerberosId': 'suufi', 'givenName': 'Mohamed', 'familyName': 'Suufi', 'middleName': None, 'displayName': 'Mohamed Suufi', 'email': 'suufi@mit.edu', 'phoneNumber': None, 'website': None, 'affiliations': [{'type': 'student', 'classYear': '2', 'departments': [{'code': '6', 'name': 'Electrical Eng & Computer Sci'}], 'courses': [{'departmentCode': '6', 'courseOption': '7', 'name': 'Computer Science and Molecular Biology (Course 6-7)'}]}], 'mitDirectorySuppressed': False}}
-
-        # for role in available_roles:
-        #     if role.name == kerb_data
-
-        # member.add_roles()
 
     def set_logging_channel(self, channel_id: int):
         # log in pickle file

@@ -1,4 +1,5 @@
 import contextlib
+import datetime
 import io
 import os
 import textwrap
@@ -12,7 +13,7 @@ from mitdb import MITUserDB
 
 load_dotenv()
 
-bot = discord.Bot(owner_id=os.getenv("OWNER_ID"))
+bot = discord.Bot(owner_id=os.getenv("OWNER_ID"), intents=discord.Intents.all())
 admin = bot.create_group("admin", "Admin Commands")
 
 userdb = MITUserDB(bot)
@@ -401,6 +402,72 @@ async def eval(ctx: discord.ApplicationContext, code: str):
     ]
     paginator = pages.Paginator([formatted_pages])
     await paginator.respond(ctx.interaction)
+
+
+@bot.event
+async def on_typing(
+    channel: discord.abc.Messageable, user: discord.User, when: datetime.datetime
+):
+    """Event handler for when a user starts typing in a channel."""
+
+    print("User started typing in channel:", channel.name)
+    if user.bot:
+        return
+
+    if not isinstance(channel, discord.TextChannel):
+        return
+
+    # check last time user had roles updated, if it's been more than 24 hours, check if roles should change
+    user_data = userdb.get_user_from_discordid(user.id)
+    if user_data is None:
+        print("User not found in database, skipping role update check.")
+        return
+
+    # if undefined or more than 24 hours since last roles update, check roles
+    if "last_roles_updated" in user_data:
+        print("User found in database, checking last roles update time.")
+        last_updated = user_data["last_roles_updated"]
+        if (when - last_updated).total_seconds() < 86400:
+            return
+
+    kerb = user_data["kerb"]
+    if not kerb.endswith("@alum.mit.edu"):
+        # if not alum, fetch kerb info
+        print("Fetching kerb info for user:", kerb)
+        kerb_info = userdb.fetch_kerb_info(kerb)
+
+        if not kerb_info:
+            return
+
+    roles = await userdb.assign_discord_roles(
+        channel.guild.id, user.id, kerb, True, kerb.endswith("@alum.mit.edu")
+    )
+    print("Roles assigned:", roles)
+
+    # if roles were updated, send a message to the channel
+    if roles:
+        print("Roles updated for user:", user.name)
+        roles_names = [role.name for role in roles]
+        await channel.guild.get_channel(userdb.logging_channel_id).send(
+            f"Roles updated for {user.mention} ({user.id}): {', '.join(roles_names)}"
+        )
+
+
+@bot.event
+async def on_member_join(member: discord.Member):
+    """Event handler for when a member joins a guild."""
+    print(f"Member joined: {member.name} ({member.id})")
+    if not isinstance(member, discord.Member):
+        return
+
+    # Assign roles based on verification status
+    roles = await userdb.assign_discord_roles(member.guild.id, member.id, member.name)
+    if roles:
+        await member.guild.get_channel(userdb.logging_channel_id).send(
+            f"Roles assigned to {member.mention} ({member.id}): {', '.join(role.name for role in roles)}"
+        )
+    else:
+        print(f"No roles assigned to {member.name}.")
 
 
 @bot.event
