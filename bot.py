@@ -424,9 +424,9 @@ async def on_typing(
         return
 
     # if undefined or more than 24 hours since last roles update, check roles
-    if "last_roles_updated" in user_data:
+    if "lastRoleUpdate" in user_data:
         print("User found in database, checking last roles update time.")
-        last_updated = user_data["last_roles_updated"]
+        last_updated = user_data["lastRoleUpdate"]
         if (when - last_updated).total_seconds() < 86400:
             return
 

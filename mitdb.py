@@ -314,8 +314,16 @@ class MITUserDB:
         ]
         if not dry_run:
             await member.add_roles(*roles_to_add)
+            users.update_one(
+                {"kerb": kerb},
+                {
+                    "$set": {
+                        "lastRoleUpdate": datetime.datetime.now(),
+                    }
+                },
+            )
 
-        if not dry_run:
+        if not dry_run and roles_to_add:
             logging_channel = self.bot.get_channel(self.logging_channel_id)
             if isinstance(logging_channel, discord.TextChannel):
                 await logging_channel.send(
